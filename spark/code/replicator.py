@@ -3,11 +3,9 @@ import time
 from datetime import datetime
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import lit, col
+from pyspark.sql.functions import col
 
-KAFKA_BROKER = '172.29.112.212:9092'
-DEST_KAFKA_BROKER = KAFKA_BROKER
-
+KAFKA_BROKER = 'kafka:9092'
 SOURCE_TOPIC = 'first-topic'
 DEST_TOPIC = 'second-topic'
 
@@ -38,7 +36,7 @@ def process_each_batch(batch_df: DataFrame, batch_id) :
         .selectExpr("to_json(struct(*)) as value")
         .write
         .format("kafka")
-        .option("kafka.bootstrap.servers", DEST_KAFKA_BROKER)
+        .option("kafka.bootstrap.servers", KAFKA_BROKER)
         .option("topic", DEST_TOPIC)
         .option("batchsize", "50000")
         .mode("append")
