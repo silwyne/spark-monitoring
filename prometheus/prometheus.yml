@@ -1,0 +1,59 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+
+# -------------------------------------------------------------
+# Spark Metrics (Driver + Worker + Master)
+# -------------------------------------------------------------
+
+
+  - job_name: 'spark-metrics'
+    metrics_path: '/metrics/prometheus/'
+
+    metric_relabel_configs:
+
+      # Remove Spark Structured Streaming query UUID from metric names
+      - source_labels: [__name__]
+        regex: 'metrics_spark_driver_spark_streaming_[a-f0-9_]+_(.*)'
+        target_label: __name__
+        replacement: 'metrics_spark_driver_spark_streaming_$1'
+
+      # Optional: remove duplicated "_Value" suffix
+      - source_labels: [__name__]
+        regex: '(.*)_Value$'
+        target_label: __name__
+        replacement: '${1}'
+
+      # Optional: remove duplicated "_Number" suffix
+      - source_labels: [__name__]
+        regex: '(.*)_Number$'
+        target_label: __name__
+        replacement: '${1}'
+
+    static_configs:
+      - targets:
+          - 'spark-master:8080'
+          - 'spark-worker:8081'
+          - 'spark-job:4040'
+        labels:
+          jobname: monitorings-lab
+
+
+
+# -------------------------------------------------------------
+# Spark Metrics (Executor)
+# -------------------------------------------------------------
+
+
+  - job_name: 'spark-executors-metrics'
+    metrics_path: '/metrics/executors/prometheus/'
+
+    static_configs:
+      - targets:
+          - 'spark-job:4040'
+        labels:
+          jobname: monitorings-lab
+

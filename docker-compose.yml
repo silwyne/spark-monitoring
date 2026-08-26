@@ -1,0 +1,106 @@
+networks:
+  spark-monitoring-lab:
+    name: spark-monitoring-lab
+    driver: bridge
+
+services:
+
+
+  spark-master:
+    image: spark:3.5.6-python3
+    container_name: spark-master
+    hostname: spark-master
+    user: root
+    ports:
+      - "8080:8080"   # Master UI
+      - "7077:7077"   # Master RPC
+    volumes:
+      - ./spark/configs/:/opt/spark/conf
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-master.sh &&
+      tail -f /dev/null
+      "
+    networks:
+      - spark-monitoring-lab
+
+
+  spark-worker:
+    image: spark:3.5.6-python3
+    container_name: spark-worker
+    hostname: spark-worker
+    user: root
+    depends_on:
+      - spark-master
+    ports:
+      - "8082:8081"   # Worker UI
+    volumes:
+      - ./spark/configs/:/opt/spark/conf
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+      &&
+      tail -f /dev/null
+      "
+    networks:
+      - spark-monitoring-lab
+
+
+  spark-job:
+    image: spark:3.5.6-python3
+    container_name: spark-job
+    hostname: spark-job
+    user: root
+    depends_on:
+      - spark-master
+      - spark-worker
+    ports:
+      - "4040:4040"   # Driver Spark UI
+    volumes:
+      - ./spark/code:/src
+      - ./spark/dependencies:/dependencies
+      - ./spark/configs/:/opt/spark/conf
+    command: >
+      bash -c "
+      /opt/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --deploy-mode client
+      --jars $$(echo /dependencies/*.jar | tr ' ' ',')
+      /src/replicator.py
+      "
+    networks:
+      - spark-monitoring-lab
+
+
+  prometheus:
+    user: root
+    image: prom/prometheus:v3
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /var/data/infrastructure/prometheus-mon:/prometheus
+    environment:
+      - TZ=Asia/Tehran
+    restart: unless-stopped
+    networks:
+      - spark-monitoring-lab
+
+  grafana:
+    user: root
+    image: grafana/grafana:13.0-slim
+    container_name: grafana
+    hostname: grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - /var/data/infrastructure/grafana-mon:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: grafana
+      GF_SECURITY_ADMIN_PASSWORD: grafana
+      TZ: Asia/Tehran
+    networks:
+      - spark-monitoring-lab
